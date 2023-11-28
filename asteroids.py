@@ -21,6 +21,15 @@ for side in range(4):
     border.lt(90)
 border.hideturtle()
 
+# Write Status
+status = turtle.Turtle()
+status.penup()
+status.hideturtle()
+status.goto(-325, 355)
+status.pendown()
+status.color("White")
+status.write("Asteroids Game created by Balls Fortnite Gamers!!",font=("Arial", 20, "normal"))
+
 # Create Player
 ship = turtle.Turtle()
 ship.speed(0)
@@ -30,12 +39,21 @@ ship.shapesize(1, 1.25, 1)
 ship.color("white")
 ship.setheading(90)
 
+# Create Bullet
+bullet = turtle.Turtle()
+bullet.penup()
+bullet.speed(0)
+bullet.shape("circle")
+bullet.color("white")
+bullet.shapesize(0.35, 0.35, 1)
+bullet.hideturtle()
+
 # World Building variables
 speeds = [0, 0]
 terminal_velocity = 8
+bullet_speed = 25
+shooting = False
 
-
-# Event Handlers
 def rotate_clockwise():
     """rotates the ship clockwise"""
     ship.right(25)
@@ -56,11 +74,23 @@ def boost():
         speeds[1] += y_angle
 
 
+def shoot():
+    if not shooting:
+        bullet.setposition(ship.xcor(), ship.ycor())
+        bullet.showturtle()
+        bullet.setheading(ship.heading())
+
+
+# Event Handlers
 turtle.listen()
 turtle.onkeypress(rotate_clockwise, "Right")
 turtle.onkeypress(rotate_counter_clockwise, "Left")
 turtle.onkeypress(boost, "Up")
+turtle.onkey(turtle.bye, "Escape")
+turtle.onkey(shoot, "space")
 
+
+# Main game loop
 while playing:
     x = ship.xcor()
     y = ship.ycor()
@@ -68,5 +98,12 @@ while playing:
         ship.setposition(-x, y)
     if abs(y) >= 350:
         ship.setposition(x, -y)
+
+    if abs(bullet.xcor()) >= 350 or abs(bullet.ycor()) >= 350:
+        bullet.hideturtle()
+        shooting = False
+    else:
+        shooting = True
+        bullet.forward(bullet_speed)
 
     ship.setposition(ship.xcor() + speeds[0], ship.ycor() + speeds[1])
