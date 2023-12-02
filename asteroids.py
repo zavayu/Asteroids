@@ -1,19 +1,32 @@
+# By submitting this assignment, I agree to the following:
+#   "Aggies do not lie, cheat, or steal, or tolerate those who do."
+#   "I have not given or received any unauthorized aid on this assignment."
+#
+# Names:        Zavier Vega-Yu
+#               Andrew Kim
+#               Andre Bui
+#               Colby Ideker
+# Section:      509
+# Assignment:   Lab 13
+# Date:        1 December, 2023
+
 import csv
 import random
 import turtle
 import math
 import time
+import winsound
 
-playing = False
-stop = False
-score = 0
-level = 0
+playing = False  # True if game is running
+stop = False  # True if menu is closed
+score = 0  # Increments by 20 for each asteroid destroyed
+level = 0  # Increments whenever all asteroids are cleared
+lives = 3
 
 try:
     file = open("HighScores.dat", "r+")
 except FileNotFoundError:
     print("Missing HighScores.dat file!")
-    turtle.bye()
 
 # Window Setup
 wn = turtle.Screen()
@@ -129,7 +142,7 @@ shooting = False
 ship.rcc = False
 ship.rc = False
 ship.boosting = False
-
+shot = False
 
 # To create smoother movement from input from the user, we create a simple
 # function call which changes just one boolean value of the ship
@@ -191,6 +204,9 @@ def boost():
 def shoot():
     """If a bullet is not currently firing, fires a bullet from the player's ship"""
     if not shooting:
+        global shot
+        shot = True
+        winsound.PlaySound("shoot.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
         bullet.setposition(ship.xcor(), ship.ycor())
         bullet.showturtle()
         bullet.setheading(ship.heading())
@@ -209,7 +225,7 @@ def check_collision(projectile):
             return True, asteroid
 
 
-def add_asteroid(size=1, x_max=4, y_max=4, ast_x=-500, ast_y=-500):
+def add_asteroid(size=1, x_max=4, y_max=4, ast_x=-500, ast_y=-500, x_vel=0, y_vel=0):
     """Adds an asteroid to the screen"""
     asteroid = turtle.Turtle()
     asteroid.penup()
@@ -221,12 +237,9 @@ def add_asteroid(size=1, x_max=4, y_max=4, ast_x=-500, ast_y=-500):
     if ast_x == -500 or ast_y == -500:
         ast_x = random.randint(-290, 290)
         ast_y = random.randint(-290, 290)
-        while (-100 <= ast_x <= 100) or (-100 <= ast_x <= 100):
+        while (-100 <= ast_x <= 100) or (-100 <= ast_y <= 100):
             ast_x = random.randint(-290, 290)
             ast_y = random.randint(-290, 290)
-
-    x_vel = random.randint(-x_max, x_max)
-    y_vel = random.randint(-y_max, y_max)
     while x_vel == 0 or y_vel == 0:
         x_vel = random.randint(-x_max, x_max)
         y_vel = random.randint(-y_max, y_max)
@@ -240,16 +253,19 @@ def split_asteroid(asteroid):
     size = asteroids[asteroid][4]
     ast_x = asteroid.xcor()
     ast_y = asteroid.ycor()
+    x_vel = asteroids[asteroid][0]
+    y_vel = asteroids[asteroid][1]
 
     size -= 1
-    add_asteroid(size, 4, 4, ast_x + 1, ast_y + 1)
-    add_asteroid(size, 4, 4, ast_x + 1, ast_y + 1)
+    add_asteroid(size, 4, 4, ast_x, ast_y + 0.5, x_vel + 0.5)
+    add_asteroid(size, 4, 4, ast_x, ast_y + 0.5, y_vel + 0.5)
 
 
 def del_asteroid(asteroid):
     """Deletes an asteroid from the screen and dictionary"""
     asteroid.hideturtle()
     asteroids.pop(asteroid)
+    winsound.PlaySound("explosion.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
 
 
 # Write score at top of frame
@@ -266,6 +282,19 @@ level_pen.goto(255, -390)
 level_pen.color("White")
 level_pen.hideturtle()
 
+# Display lives at the bottom of frame
+lives_pens = []
+for i in range(3):
+    lives_pen = turtle.Turtle()
+    lives_pen.penup()
+    lives_pen.goto(-300 + i * 30, -375)
+    lives_pen.shape("triangle")
+    lives_pen.speed(0)
+    lives_pen.shapesize(1, 1.25, 2)
+    lives_pen.color("light blue", "Black")
+    lives_pen.setheading(90)
+    lives_pens.append(lives_pen)
+
 
 def update_score():
     """Updates the score at the top of the frame"""
@@ -281,8 +310,17 @@ def update_flame():
 
 
 def update_level():
+    """Updates the level label at the bottom of the frame"""
     level_pen.clear()
     level_pen.write(f"Level: {level}", font=("Impact", 20, "normal"))
+
+
+def lose_life():
+    """Removes one life turtle at the bottom of the frame"""
+    for i in range(2, 0, -1):
+        if lives_pens[i].isvisible():
+            lives_pens[i].hideturtle()
+            break
 
 
 # Main Event Handlers
@@ -311,7 +349,11 @@ while playing:
     if len(asteroids) == 0:
         level += 1
         update_level()
-        lvl_file = open("Levels.csv", "r")
+        try:
+            lvl_file = open("Levels.csv", "r")
+        except FileNotFoundError:
+            print("MISSING LEVEL FILE!")
+            break
         lvl_reader = csv.reader(lvl_file)
         first_line = True
         for data in lvl_reader:
@@ -345,11 +387,13 @@ while playing:
         shooting = False
     else:
         shooting = True
+        shot = True
         bullet.forward(bullet_speed)
 
     # Move the ship
     ship.setposition(ship.xcor() + speeds[0], ship.ycor() + speeds[1])
-    update_flame()
+    update_flame()  # This line is needed to keep flame with ship
+
     # Apply friction force
     if speeds[0] != 0:
         speeds[0] -= (0.05 * abs(speeds[0]) / speeds[0])
@@ -369,8 +413,18 @@ while playing:
     # If the ship collides with an asteroid, decrease life, teleport to 0,0
     # If out of lives, game over
     if check_collision(ship):
-        ship.goto(0, 0)
-        speeds[0:2] = [0, 0]
+        if (ship.xcor() != 0 and ship.ycor() != 0) and (speeds[0:2] != [0,0]) or shot:
+            lives -= 1
+            winsound.PlaySound("death.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
+            shot = False
+            lose_life()
+            if lives == 0:
+                playing = False
+                lives_pens[0].hideturtle()
+            else:
+                ship.goto(0, 0)
+                speeds[0:2] = [0, 0]
+                time.sleep(0.125)
 
     # If an asteroid is shot, split into two smaller, faster asteroids
     if check_collision(bullet) and shooting:
@@ -386,39 +440,49 @@ while playing:
 file.write(f'{score}\n')
 lvl_file.close()
 lines = file.readlines() + [score]
-scores = []
-highest_scores = []
+scores = []  # Contains a list of all scores in HighScores.dat
+highest_scores = []  # Contains the three highest scores from scores[]
 
 for line in lines:
     scores.append(int(line))
 file.close()
-if len(lines) > 3:
+if len(lines) > 3:  # If there are more than 3 scores, locate them
     for _ in range(3):
         maximum = max(scores)
         highest_scores.append(str(maximum))
         scores.pop(scores.index(maximum))
-else:
+else: # If there is less than 3 scores, those are the high scores
     for s in scores:
         highest_scores.append(str(s))
     for s in range(3 - len(lines)):
         highest_scores.append("0")
 
 if played_game:
+    # If game has been played and exited, display a game over message and list of high scores
     playing = True
     while playing:
+        # First clear the screen by hiding all turtles
         ship.hideturtle()
         bullet.hideturtle()
+        flame.hideturtle()
+        for asteroid in asteroids:
+            asteroid.hideturtle()
+
+        # Use write_score turtle to write to screen
         write_score.penup()
         write_score.goto(0, 0)
         write_score.color("Light Blue")
+        # Writes game over to screen
         write_score.write(f"GAME OVER", align="center", font=("Impact", 80, "normal"))
         write_score.goto(0, -50)
         write_score.color("white")
+        # Writes high scores to screen
         write_score.write(f"High Scores:", align="center", font=("Times New Roman", 35, "normal"))
         write_score.goto(0, -210)
         write_score.color("white")
         display_scores = ""
         you = False
+        # If you placed on the leaderboard, put (YOU!) next to your score
         for i, high in enumerate(highest_scores):
             if int(high) == score and not you:
                 display_scores += f"{i + 1}:  {high} (YOU!)\n"
@@ -426,6 +490,4 @@ if played_game:
             else:
                 display_scores += f"{i + 1}:  {high}\n"
         write_score.write(display_scores, align="center", font=("Times New Roman", 25, "normal"))
-        for asteroid in asteroids:
-            asteroid.hideturtle()
         turtle.update()
