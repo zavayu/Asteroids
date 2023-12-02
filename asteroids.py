@@ -1,19 +1,8 @@
-# By submitting this assignment, I agree to the following:
-#   "Aggies do not lie, cheat, or steal, or tolerate those who do."
-#   "I have not given or received any unauthorized aid on this assignment."
-#
-# Names:        Zavier Vega-Yu
-#               Andrew Kim
-#               Andre Bui
-#               Colby Ideker
-# Section:      509
-# Assignment:   Lab 13
-# Date:        1 December, 2023
-
 import csv
 import random
 import turtle
 import math
+import playsound  # 'pip install playsound' in the console to use this!
 import time
 import winsound
 
@@ -22,11 +11,14 @@ stop = False  # True if menu is closed
 score = 0  # Increments by 20 for each asteroid destroyed
 level = 0  # Increments whenever all asteroids are cleared
 lives = 3
+colors = ["Red", "Orange", "Light Blue"]
 
 try:
     file = open("HighScores.dat", "r+")
 except FileNotFoundError:
     print("Missing HighScores.dat file!")
+
+playsound.playsound("music.mp3", False)
 
 # Window Setup
 wn = turtle.Screen()
@@ -321,6 +313,7 @@ def lose_life():
         if lives_pens[i].isvisible():
             lives_pens[i].hideturtle()
             break
+    ship.color(colors[lives - 1], "black")
 
 
 # Main Event Handlers
