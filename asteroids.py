@@ -1,3 +1,4 @@
+import csv
 import random
 import turtle
 import math
@@ -6,6 +7,13 @@ import time
 playing = False
 stop = False
 score = 0
+level = 0
+
+try:
+    file = open("HighScores.dat", "r+")
+except FileNotFoundError:
+    print("Missing HighScores.dat file!")
+    turtle.bye()
 
 # Window Setup
 wn = turtle.Screen()
@@ -201,7 +209,7 @@ def check_collision(projectile):
             return True, asteroid
 
 
-def add_asteroid(size=1, x_max=4, y_max=4):
+def add_asteroid(size=1, x_max=4, y_max=4, ast_x=-500, ast_y=-500):
     """Adds an asteroid to the screen"""
     asteroid = turtle.Turtle()
     asteroid.penup()
@@ -209,25 +217,39 @@ def add_asteroid(size=1, x_max=4, y_max=4):
     asteroid.speed(0)
     asteroid.shape("circle")
     asteroid.color("#784c00", "Black")
-    ast_x = random.randint(-290, 290)
-    ast_y = random.randint(-290, 290)
-    x_vel = random.randint(-x_max, x_max)
-    y_vel = random.randint(-y_max, y_max)
 
-    while (-100 <= ast_x <= 100) or (-100 <= ast_x <= 100):
+    if ast_x == -500 or ast_y == -500:
         ast_x = random.randint(-290, 290)
         ast_y = random.randint(-290, 290)
+        while (-100 <= ast_x <= 100) or (-100 <= ast_x <= 100):
+            ast_x = random.randint(-290, 290)
+            ast_y = random.randint(-290, 290)
+
+    x_vel = random.randint(-x_max, x_max)
+    y_vel = random.randint(-y_max, y_max)
     while x_vel == 0 or y_vel == 0:
         x_vel = random.randint(-x_max, x_max)
         y_vel = random.randint(-y_max, y_max)
 
     asteroid.setposition(ast_x, ast_y)
-    asteroids[asteroid] = [x_vel, y_vel]
+    asteroids[asteroid] = [x_vel, y_vel, x_max, y_max, size]
 
 
 def split_asteroid(asteroid):
     """splits an asteroid into 2 smaller asteroids"""
-    pass
+    size = asteroids[asteroid][4]
+    ast_x = asteroid.xcor()
+    ast_y = asteroid.ycor()
+
+    size -= 1
+    add_asteroid(size, 4, 4, ast_x + 1, ast_y + 1)
+    add_asteroid(size, 4, 4, ast_x + 1, ast_y + 1)
+
+
+def del_asteroid(asteroid):
+    """Deletes an asteroid from the screen and dictionary"""
+    asteroid.hideturtle()
+    asteroids.pop(asteroid)
 
 
 # Write score at top of frame
@@ -236,7 +258,13 @@ write_score.penup()
 write_score.goto(235, 355)
 write_score.color("Gold")
 write_score.hideturtle()
-write_score.pendown()
+
+# Write level at the bottom of frame
+level_pen = turtle.Turtle()
+level_pen.penup()
+level_pen.goto(255, -390)
+level_pen.color("White")
+level_pen.hideturtle()
 
 
 def update_score():
@@ -252,12 +280,10 @@ def update_flame():
     flame.setheading(180 + ship.heading())
 
 
-# Level 1 Setup
-add_asteroid(5, 2, 2)
-add_asteroid(4, 3, 3)
-add_asteroid(3, 4, 4)
-add_asteroid(5, 2, 2)
-add_asteroid(4, 3, 3)
+def update_level():
+    level_pen.clear()
+    level_pen.write(f"Level: {level}", font=("Impact", 20, "normal"))
+
 
 # Main Event Handlers
 turtle.onkeypress(rc_on, "Right")
@@ -269,9 +295,10 @@ turtle.onkeyrelease(boost_off, "Up")
 turtle.onkey(end_game, "Escape")
 turtle.onkey(shoot, "space")
 
-
+played_game = False
 # Main game loop
 while playing:
+    played_game = True
     # Basic game updates, 0.03 tic rate
     turtle.update()
     update_score()
@@ -279,6 +306,21 @@ while playing:
     time.sleep(0.03)
     x = ship.xcor()
     y = ship.ycor()
+
+    # Level setup
+    if len(asteroids) == 0:
+        level += 1
+        update_level()
+        lvl_file = open("Levels.csv", "r")
+        lvl_reader = csv.reader(lvl_file)
+        first_line = True
+        for data in lvl_reader:
+            if first_line:
+                first_line = False
+                continue
+            curr = data[0]
+            if int(curr) == level:
+                add_asteroid(int(data[1]), int(data[2]), int(data[3]))
 
     # Move the ship from user input
     if ship.rcc:
@@ -327,17 +369,63 @@ while playing:
     # If the ship collides with an asteroid, decrease life, teleport to 0,0
     # If out of lives, game over
     if check_collision(ship):
-        print("YOU HAVE COLLIDED WITH AN ASTEROID!!")
         ship.goto(0, 0)
         speeds[0:2] = [0, 0]
 
     # If an asteroid is shot, split into two smaller, faster asteroids
     if check_collision(bullet) and shooting:
-        print("YOU JUST SHOT AN ASTEROID!!")
+        shooting = False
         ast_shot = check_collision(bullet)[1]
-        ast_shot.hideturtle()
-        asteroids.pop(ast_shot)
-        ast_size = ast_shot.shapesize()[0]
-        if ast_size > 2:
+        if asteroids[ast_shot][4] > 2:
             split_asteroid(ast_shot)
+        del_asteroid(ast_shot)
         score += 20
+        bullet.setposition(-500, -500)
+
+# End of game loop - calculate high scores
+file.write(f'{score}\n')
+lvl_file.close()
+lines = file.readlines() + [score]
+scores = []
+highest_scores = []
+
+for line in lines:
+    scores.append(int(line))
+file.close()
+if len(lines) > 3:
+    for _ in range(3):
+        maximum = max(scores)
+        highest_scores.append(str(maximum))
+        scores.pop(scores.index(maximum))
+else:
+    for s in scores:
+        highest_scores.append(str(s))
+    for s in range(3 - len(lines)):
+        highest_scores.append("0")
+
+if played_game:
+    playing = True
+    while playing:
+        ship.hideturtle()
+        bullet.hideturtle()
+        write_score.penup()
+        write_score.goto(0, 0)
+        write_score.color("Light Blue")
+        write_score.write(f"GAME OVER", align="center", font=("Impact", 80, "normal"))
+        write_score.goto(0, -50)
+        write_score.color("white")
+        write_score.write(f"High Scores:", align="center", font=("Times New Roman", 35, "normal"))
+        write_score.goto(0, -210)
+        write_score.color("white")
+        display_scores = ""
+        you = False
+        for i, high in enumerate(highest_scores):
+            if int(high) == score and not you:
+                display_scores += f"{i + 1}:  {high} (YOU!)\n"
+                you = True
+            else:
+                display_scores += f"{i + 1}:  {high}\n"
+        write_score.write(display_scores, align="center", font=("Times New Roman", 25, "normal"))
+        for asteroid in asteroids:
+            asteroid.hideturtle()
+        turtle.update()
