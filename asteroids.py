@@ -2,7 +2,7 @@ import csv
 import random
 import turtle
 import math
-import playsound  # 'pip install playsound' in the console to use this!
+import playsound  # 'pip install playsound' in the terminal to use this!
 import time
 import winsound
 
@@ -17,8 +17,6 @@ try:
     file = open("HighScores.dat", "r+")
 except FileNotFoundError:
     print("Missing HighScores.dat file!")
-
-playsound.playsound("music.mp3", False)
 
 # Window Setup
 wn = turtle.Screen()
@@ -69,6 +67,8 @@ inst.pendown()
 written_instructions = ("• Use Arrow Keys to move\n• Press Space to shoot\n• Hit an asteroid and you lose a life\n•You "
                         "have a total of 3 lives\n• Clear asteroids to gain points!\n• Press Escape to exit")
 inst.write(written_instructions, align="center", font=("Times New Roman", 20, "normal"))
+
+playsound.playsound("music.mp3", False)
 
 
 def end_game():
@@ -224,7 +224,8 @@ def add_asteroid(size=1, x_max=4, y_max=4, ast_x=-500, ast_y=-500, x_vel=0, y_ve
     asteroid.shapesize(size, size, 3)
     asteroid.speed(0)
     asteroid.shape("circle")
-    asteroid.color("#784c00", "Black")
+    #asteroid.color("#784c00", "Black")
+    asteroid.color("Gray", "Black")
 
     if ast_x == -500 or ast_y == -500:
         ast_x = random.randint(-290, 290)
@@ -307,11 +308,14 @@ def update_level():
     level_pen.write(f"Level: {level}", font=("Impact", 20, "normal"))
 
 
-def lose_life():
-    """Removes one life turtle at the bottom of the frame"""
-    for i in range(2, 0, -1):
-        if lives_pens[i].isvisible():
-            lives_pens[i].hideturtle()
+def update_lives():
+    """Updates the lives at the bottom of the frame"""
+    if lives == 0:
+        lives_pens[0].hideturtle()
+        end_game()
+    for j in range(2, 0, -1):
+        if lives_pens[j].isvisible():
+            lives_pens[j].hideturtle()
             break
     ship.color(colors[lives - 1], "black")
 
@@ -373,6 +377,11 @@ while playing:
         ship.setposition(-x + abs(x)/x, y)
     if abs(y) >= 360:
         ship.setposition(x, -y + abs(y)/y)
+    # Hide the ship when it crosses border
+    if abs(x) <= 350 and abs(y) <= 350:
+        ship.showturtle()
+    else:
+        ship.hideturtle()
 
     # Hide bullet and allow the player to shoot again once bullet exits frame
     if abs(bullet.xcor()) >= 350 or abs(bullet.ycor()) >= 350:
@@ -397,11 +406,15 @@ while playing:
     for ast in asteroids:
         x1 = ast.xcor()
         y1 = ast.ycor()
-        if abs(x1) >= (350 - ast.shapesize()[0] * 12):
+        if abs(x1) >= (380 - ast.shapesize()[0] * 12):
             ast.setposition(-x1 + abs(x1) / x1, y1)
-        if abs(y1) >= (350 - ast.shapesize()[0] * 12):
+        if abs(y1) >= (380 - ast.shapesize()[0] * 12):
             ast.setposition(x1, -y1 + abs(y1) / y1)
         ast.setposition(ast.xcor() + asteroids[ast][0], ast.ycor() + asteroids[ast][1])
+        if abs(x1) >= (370 - ast.shapesize()[0] * 12) or abs(y1) >= (370 - ast.shapesize()[0] * 12):
+            ast.hideturtle()
+        else:
+            ast.showturtle()
 
     # If the ship collides with an asteroid, decrease life, teleport to 0,0
     # If out of lives, game over
@@ -410,14 +423,10 @@ while playing:
             lives -= 1
             winsound.PlaySound("death.wav", winsound.SND_FILENAME | winsound.SND_ASYNC)
             shot = False
-            lose_life()
-            if lives == 0:
-                playing = False
-                lives_pens[0].hideturtle()
-            else:
-                ship.goto(0, 0)
-                speeds[0:2] = [0, 0]
-                time.sleep(0.125)
+            update_lives()
+            ship.goto(0, 0)
+            speeds[0:2] = [0, 0]
+            time.sleep(0.125)
 
     # If an asteroid is shot, split into two smaller, faster asteroids
     if check_collision(bullet) and shooting:
@@ -428,6 +437,8 @@ while playing:
         del_asteroid(ast_shot)
         score += 20
         bullet.setposition(-500, -500)
+    if level > 10:
+        playing = False
 
 # End of game loop - calculate high scores
 file.write(f'{score}\n')
@@ -466,7 +477,10 @@ if played_game:
         write_score.goto(0, 0)
         write_score.color("Light Blue")
         # Writes game over to screen
-        write_score.write(f"GAME OVER", align="center", font=("Impact", 80, "normal"))
+        message = "GAME OVER"
+        if level > 10:
+            message = "YOU WIN"
+        write_score.write(message, align="center", font=("Impact", 80, "normal"))
         write_score.goto(0, -50)
         write_score.color("white")
         # Writes high scores to screen
